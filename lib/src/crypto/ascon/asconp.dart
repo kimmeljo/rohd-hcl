@@ -113,8 +113,7 @@ List<Logic> applyAsconSbox(List<Logic> chunks) {
 }
 
 /// Linear diffusion function for ASCON permutation function.
-List<Logic> applyLinearDiffusion(Logic input) {
-  final chunks = getChunks(input);
+List<Logic> applyLinearDiffusion(List<Logic> chunks) {
   final outChunks = <Logic>[];
   for (var i = 0; i < chunks.length; i++) {
     final curr = chunks[i] ^
@@ -138,7 +137,7 @@ Pipeline asconPermutation(Logic input, Logic clk, Logic rst,
           chunks
             ..setAll(0, applyAsconRoundConstant(chunks, rounds - index - 1))
             ..setAll(0, applyAsconSbox(chunks))
-            ..setAll(0, applyLinearDiffusion(input));
+            ..setAll(0, applyLinearDiffusion(chunks));
           return (p) => [
                 p.get(currChunk) < chunks.swizzle(),
               ];
@@ -148,7 +147,7 @@ Pipeline asconPermutation(Logic input, Logic clk, Logic rst,
           chunks
             ..setAll(0, applyAsconRoundConstant(chunks, rounds - index - 1))
             ..setAll(0, applyAsconSbox(chunks))
-            ..setAll(0, applyLinearDiffusion(input));
+            ..setAll(0, applyLinearDiffusion(chunks));
           return (p) => [
                 sChunks < p.get(currChunk),
                 p.get(currChunk) < chunks.swizzle(),
