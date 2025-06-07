@@ -26,7 +26,8 @@ class ReductionTree extends Module {
   /// Operation to be performed at each node. Note that [operation] can widen
   /// the output. The logic function must support the operation for 2 and up to
   /// [radix] inputs.
-  final Logic Function(List<Logic> inputs, {String name}) operation;
+  final Logic Function(List<Logic> inputs,
+      {String name, Logic? clk, Logic? reset}) operation;
 
   /// Specified width of input to each reduction node (e.g., binary: radix=2)
   final int radix;
@@ -120,7 +121,7 @@ class ReductionTree extends Module {
   /// Build out the recursive tree
   void _buildLogic() {
     if (_sequence.length <= radix) {
-      final value = operation(_sequence);
+      final value = operation(_sequence, clk: _clk, reset: _reset);
       addOutput('out', width: value.width) <= value;
       _computed = (value: output('out'), depth: 0, flopDepth: 0);
     } else {
@@ -157,7 +158,9 @@ class ReductionTree extends Module {
           signExtend ? r.signExtend(alignWidth) : r.zeroExtend(alignWidth));
 
       final value = operation(resultsExtend.toList(),
-          name: 'reduce_d${(treeDepth + 1) + flopDepth * (depthToFlop ?? 0)}');
+          name: 'reduce_d${(treeDepth + 1) + flopDepth * (depthToFlop ?? 0)}',
+          clk: _clk,
+          reset: _reset);
 
       addOutput('out', width: value.width) <= value;
       _computed = (

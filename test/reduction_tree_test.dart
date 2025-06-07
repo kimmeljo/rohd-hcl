@@ -13,7 +13,8 @@ import 'package:rohd_hcl/rohd_hcl.dart';
 import 'package:rohd_vf/rohd_vf.dart';
 import 'package:test/test.dart';
 
-Logic addReduceAdders(List<Logic> inputs, {String name = 'prefix'}) {
+Logic addReduceAdders(List<Logic> inputs,
+    {String name = 'prefix', Logic? clk, Logic? reset}) {
   if (inputs.length < 4) {
     return inputs.reduce((v, e) => v + e);
   } else {
@@ -30,7 +31,8 @@ void main() {
   tearDown(() async {
     await Simulator.reset();
   });
-  Logic addReduce(List<Logic> inputs, {String name = ''}) {
+  Logic addReduce(List<Logic> inputs,
+      {String name = '', Logic? clk, Logic? reset}) {
     final a = inputs.reduce((v, e) => v + e);
     return a;
   }
