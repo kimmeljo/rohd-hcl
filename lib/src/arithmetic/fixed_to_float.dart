@@ -60,7 +60,7 @@ class FixedToFloat extends Module {
     final bias = float.floatingPointValue.bias;
     final eMax = pow(2, float.exponent.width) - 2;
     final iWidth = (1 +
-            max(log2Ceil(fixed.n),
+            max(fixed.n == 0 ? 0 : log2Ceil(fixed.n),
                 max(log2Ceil(fixed.width), float.exponent.width)))
         .toInt();
 
