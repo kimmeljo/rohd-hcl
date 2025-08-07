@@ -660,4 +660,42 @@ void main() {
             ]),
         throwsA(isA<CsrValidationException>()));
   });
+
+  test('simple CSR Value', () async {
+    const dataWidth = 32;
+    final v1 = CsrValue(config: MyFieldCsr(width: dataWidth));
+
+    // set individual fields
+    final sc1 = LogicValue.ofInt(0x1, 2);
+    v1.setRegisterFieldVal(fieldName: 'field2', fieldValue: sc1);
+    expect(v1.getRegisterFieldVal(fieldName: 'field2').toInt(), sc1.toInt());
+
+    // full register value check
+    // field2 starts at bit offset 2, all reset values are 0
+    expect(v1.getRegisterVal().toInt(), 0x4);
+
+    // set full register value
+    final sc2 = LogicValue.ofInt(0xdeadbeef, dataWidth);
+    v1.setRegisterVal(value: sc2);
+
+    // note that field rules aren't honored but reserved fields are...
+    expect(v1.getRegisterVal().toInt(), 0xdead000f);
+
+    // 0xf
+    expect(v1.getRegisterFieldVal(fieldName: 'field1').toInt(), 0x3);
+    expect(v1.getRegisterFieldVal(fieldName: 'field2').toInt(), 0x3);
+
+    // 0xad
+    expect(v1.getRegisterFieldVal(fieldName: 'field3').toInt(), 0xad);
+
+    // 0xde
+    expect(v1.getRegisterFieldVal(fieldName: 'field4_0').toInt(), 0x0);
+    expect(v1.getRegisterFieldVal(fieldName: 'field4_1').toInt(), 0x1);
+    expect(v1.getRegisterFieldVal(fieldName: 'field4_2').toInt(), 0x1);
+    expect(v1.getRegisterFieldVal(fieldName: 'field4_3').toInt(), 0x1);
+    expect(v1.getRegisterFieldVal(fieldName: 'field4_4').toInt(), 0x1);
+    expect(v1.getRegisterFieldVal(fieldName: 'field4_5').toInt(), 0x0);
+    expect(v1.getRegisterFieldVal(fieldName: 'field4_6').toInt(), 0x1);
+    expect(v1.getRegisterFieldVal(fieldName: 'field4_7').toInt(), 0x1);
+  });
 }
