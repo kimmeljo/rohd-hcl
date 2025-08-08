@@ -17,44 +17,24 @@ import 'package:rohd_hcl/rohd_hcl.dart';
 /// The purpose is to use this class to perform reads and writes
 /// of HW CSRs without having to derive fields.
 class CsrValue {
-  late final CsrConfig _config;
-  late final int _regWidth;
-  final Map<String, LogicValue> _fieldMap = {};
+  /// Underlying config object for the provided CSR being represented.
+  late final CsrInstanceConfig config;
 
-  // /// Helper to translate a dynamic input into a LogicValue.
-  // static LogicValue fromInput(dynamic input, {required int width}) {
-  //   if (input is LogicValue) {
-  //     return input;
-  //   } else if (input is int) {
-  //     return LogicValue.ofInt(input, width);
-  //   } else if (input is BigInt) {
-  //     return LogicValue.ofBigInt(input, width);
-  //   } else if (input is String) {
-  //     return LogicValue.ofString(input);
-  //   } else if (input is bool) {
-  //     return LogicValue.ofBool(input);
-  //   } else {
-  //     throw CsrValidationException(
-  //         'Unrecognized input format for CsrValue logic $input');
-  //   }
-  // }
+  final Map<String, LogicValue> _fieldMap = {};
+  late LogicValue _noFieldRegVal;
+
+  /// Convenience mechanism for the [CsrValue]'s width.
+  int get width => config.width;
 
   /// Constructor.
-  CsrValue({required CsrConfig config}) {
-    _config = config.clone();
-    final fields = <LogicValue>[];
-    var currIdx = 0;
+  CsrValue({required CsrInstanceConfig config}) {
+    this.config = config.clone();
     for (final field in config.fields) {
-      if (currIdx < field.start) {
-        fields.add(LogicValue.ofInt(0x0, field.start - currIdx));
-        currIdx = field.start;
-      }
-      final l = LogicValue.ofInt(field.resetValue, field.width);
-      fields.add(l);
+      final l = LogicValue.ofInt(config.resetValue, config.width)
+          .getRange(field.start, field.start + field.width);
       _fieldMap[field.name] = l;
-      currIdx = field.start + field.width;
     }
-    _regWidth = currIdx;
+    _noFieldRegVal = LogicValue.ofInt(config.resetValue, config.width);
   }
 
   /// Set a given field to a given value.
@@ -62,7 +42,7 @@ class CsrValue {
       {required String fieldName, required LogicValue fieldValue}) {
     if (!_fieldMap.containsKey(fieldName)) {
       throw CsrValidationException('Field $fieldName does not exist '
-          'in register ${_config.name}');
+          'in register ${config.name}');
     }
     if (_fieldMap[fieldName]!.width != fieldValue.width) {
       throw CsrValidationException(
@@ -75,14 +55,18 @@ class CsrValue {
 
   /// Set the entire register to a given value.
   void setRegisterVal({required LogicValue value}) {
-    if (_regWidth != value.width) {
+    if (config.width != value.width) {
       throw CsrValidationException('The provided values width ${value.width} '
           'does not match the given '
-          'registers width $_regWidth.');
+          'registers width ${config.width}.');
     }
-    for (final field in _config.fields) {
-      final l = value.getRange(field.start, field.start + field.width);
-      _fieldMap[field.name] = l;
+    if (config.fields.isEmpty) {
+      _noFieldRegVal = value;
+    } else {
+      for (final field in config.fields) {
+        final l = value.getRange(field.start, field.start + field.width);
+        _fieldMap[field.name] = l;
+      }
     }
   }
 
@@ -90,23 +74,103 @@ class CsrValue {
   LogicValue getRegisterFieldVal({required String fieldName}) {
     if (!_fieldMap.containsKey(fieldName)) {
       throw CsrValidationException('Field $fieldName does not exist '
-          'in register ${_config.name}');
+          'in register ${config.name}');
     }
     return _fieldMap[fieldName]!;
   }
 
   /// Retrieve the current value of the register.
   LogicValue getRegisterVal() {
-    final vals = <LogicValue>[];
-    var currIdx = 0;
-    for (final field in _config.fields) {
-      if (currIdx < field.start) {
-        vals.add(LogicValue.ofInt(0x0, field.start - currIdx));
-        currIdx = field.start;
+    if (config.fields.isEmpty) {
+      return _noFieldRegVal;
+    } else {
+      final vals = <LogicValue>[];
+      var currIdx = 0;
+      for (final field in config.fields) {
+        if (currIdx < field.start) {
+          vals.add(LogicValue.ofInt(config.resetValue, config.width)
+              .getRange(currIdx, field.start));
+          currIdx = field.start;
+        }
+        vals.add(_fieldMap[field.name]!);
+        currIdx = field.start + field.width;
       }
-      vals.add(_fieldMap[field.name]!);
-      currIdx = field.start + field.width;
+      return vals.rswizzle();
     }
-    return vals.rswizzle();
+  }
+}
+
+/// Method to drive a [CsrValue] through a frontdoor write.
+///
+/// The write can be either to a [CsrBlock] or a [CsrTop].
+/// In the case of [CsrTop], the user should provide
+/// the target block's [CsrBlockConfig].
+Future<void> driveCsrValue(
+    {required CsrValue value,
+    required DataPortInterface intf,
+    required Logic clk,
+    CsrBlockConfig? block,
+    int? logicalRegisterIncrement}) async {
+  final addr = value.config.addr + (block?.baseAddr ?? 0);
+  if (value.width <= intf.dataWidth) {
+    await clk.nextNegedge;
+    intf.en.put(1);
+    intf.addr.put(addr);
+    intf.data.put(value.getRegisterVal().zeroExtend(intf.dataWidth));
+    await clk.nextNegedge;
+    intf.en.put(0);
+  } else {
+    final wrCnt = (value.width / intf.dataWidth).ceil();
+    final addrIncr = logicalRegisterIncrement ?? 1;
+    for (var i = 0; i < wrCnt; i++) {
+      await clk.nextNegedge;
+      intf.en.put(1);
+      intf.addr.put(addr + (i * addrIncr));
+      final endIdx = (i + 1) * intf.dataWidth > value.width
+          ? value.width
+          : (i + 1) * intf.dataWidth;
+      intf.data
+          .put(value.getRegisterVal().getRange(i * intf.dataWidth, endIdx));
+    }
+    await clk.nextNegedge;
+    intf.en.put(0);
+  }
+}
+
+/// Method to capture a [CsrValue] through a frontdoor read.
+///
+/// The read can be either to a [CsrBlock] or a [CsrTop].
+/// In the case of [CsrTop], the user should provide
+/// the target block's [CsrBlockConfig].
+///
+/// Note that all reads have a latency of 1 cycle.
+Future<void> captureCsrValue(
+    {required CsrValue value,
+    required DataPortInterface intf,
+    required Logic clk,
+    CsrBlockConfig? block,
+    int? logicalRegisterIncrement}) async {
+  final addr = value.config.addr + (block?.baseAddr ?? 0);
+  if (value.width <= intf.dataWidth) {
+    await clk.nextNegedge;
+    intf.en.put(1);
+    intf.addr.put(addr);
+    await clk.nextNegedge;
+    value.setRegisterVal(value: intf.data.value.getRange(0, value.width));
+  } else {
+    final wrCnt = (value.width / intf.dataWidth).ceil();
+    final addrIncr = logicalRegisterIncrement ?? 1;
+    final vals = <LogicValue>[];
+    for (var i = 0; i < wrCnt; i++) {
+      await clk.nextNegedge;
+      intf.en.put(1);
+      intf.addr.put(addr + (i * addrIncr));
+      await clk.nextNegedge;
+      final endIdx = (i + 1) * intf.dataWidth > value.width
+          ? (i + 1) * intf.dataWidth - value.width
+          : intf.dataWidth;
+      vals.add(intf.data.value.getRange(0, endIdx));
+    }
+    value.setRegisterVal(value: vals.rswizzle());
   }
 }
