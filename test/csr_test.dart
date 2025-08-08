@@ -372,16 +372,15 @@ void main() {
     final back2 = csrBlock.getBackdoorPortsByAddr(0x2);
 
     // perform backdoor read of csr2
-    expect(back2.rdData!.value,
+    await captureCsrValue(value: val2, intf: back2, clk: clk);
+    expect(val2.getRegisterVal(),
         LogicValue.ofInt(csr2.resetValue, rIntf.dataWidth));
 
     // perform a backdoor write and then a backdoor read of csr1
-    await clk.nextNegedge;
-    back1.wrEn!.inject(1);
-    back1.wrData!.inject(0xbeefdead);
-    await clk.nextNegedge;
-    back1.wrEn!.inject(0);
-    expect(back1.rdData!.value, LogicValue.ofInt(0xef00f3, rIntf.dataWidth));
+    val1.setRegisterVal(value: LogicValue.ofInt(0xbeefdead, val1.width));
+    await driveCsrValue(value: val1, intf: back1, clk: clk);
+    await captureCsrValue(value: val1, intf: back1, clk: clk);
+    expect(val1.getRegisterVal(), LogicValue.ofInt(0xef00f3, rIntf.dataWidth));
 
     await clk.nextNegedge;
     await clk.nextNegedge;
@@ -472,16 +471,15 @@ void main() {
     final back2 = csrTop.getBackdoorPortsByAddr(0x100, 0x2);
 
     // perform backdoor read of csr2
-    expect(back2.rdData!.value,
+    await captureCsrValue(value: val2, intf: back2, clk: clk);
+    expect(val2.getRegisterVal(),
         LogicValue.ofInt(csr2.resetValue, rIntf.dataWidth));
 
     // perform a backdoor write and then a backdoor read of csr1
-    await clk.nextNegedge;
-    back1.wrEn!.inject(1);
-    back1.wrData!.inject(0xdeadbeef);
-    await clk.nextNegedge;
-    back1.wrEn!.inject(0);
-    expect(back1.rdData!.value, LogicValue.ofInt(0xad00f3, rIntf.dataWidth));
+    val1.setRegisterVal(value: LogicValue.ofInt(0xdeadbeef, val1.width));
+    await driveCsrValue(value: val1, intf: back1, clk: clk);
+    await captureCsrValue(value: val1, intf: back1, clk: clk);
+    expect(val1.getRegisterVal(), LogicValue.ofInt(0xad00f3, rIntf.dataWidth));
 
     await clk.nextNegedge;
     await clk.nextNegedge;

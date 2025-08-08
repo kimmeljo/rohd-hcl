@@ -107,33 +107,54 @@ class CsrValue {
 /// the target block's [CsrBlockConfig].
 Future<void> driveCsrValue(
     {required CsrValue value,
-    required DataPortInterface intf,
+    required Interface<dynamic> intf,
     required Logic clk,
     CsrBlockConfig? block,
     int? logicalRegisterIncrement}) async {
-  final addr = value.config.addr + (block?.baseAddr ?? 0);
-  if (value.width <= intf.dataWidth) {
-    await clk.nextNegedge;
-    intf.en.put(1);
-    intf.addr.put(addr);
-    intf.data.put(value.getRegisterVal().zeroExtend(intf.dataWidth));
-    await clk.nextNegedge;
-    intf.en.put(0);
-  } else {
-    final wrCnt = (value.width / intf.dataWidth).ceil();
-    final addrIncr = logicalRegisterIncrement ?? 1;
-    for (var i = 0; i < wrCnt; i++) {
+  if (intf is DataPortInterface) {
+    final addr = value.config.addr + (block?.baseAddr ?? 0);
+    if (value.width <= intf.dataWidth) {
       await clk.nextNegedge;
       intf.en.put(1);
-      intf.addr.put(addr + (i * addrIncr));
-      final endIdx = (i + 1) * intf.dataWidth > value.width
-          ? value.width
-          : (i + 1) * intf.dataWidth;
-      intf.data
-          .put(value.getRegisterVal().getRange(i * intf.dataWidth, endIdx));
+      intf.addr.put(addr);
+      intf.data.put(value.getRegisterVal().zeroExtend(intf.dataWidth));
+      await clk.nextNegedge;
+      intf.en.put(0);
+    } else {
+      final wrCnt = (value.width / intf.dataWidth).ceil();
+      final addrIncr = logicalRegisterIncrement ?? 1;
+      for (var i = 0; i < wrCnt; i++) {
+        await clk.nextNegedge;
+        intf.en.put(1);
+        intf.addr.put(addr + (i * addrIncr));
+        final endIdx = (i + 1) * intf.dataWidth > value.width
+            ? value.width
+            : (i + 1) * intf.dataWidth;
+        intf.data
+            .put(value.getRegisterVal().getRange(i * intf.dataWidth, endIdx));
+      }
+      await clk.nextNegedge;
+      intf.en.put(0);
+    }
+  }
+
+  // backdoor access
+  else if (intf is CsrBackdoorInterface) {
+    if (intf.wrEn == null) {
+      throw CsrValidationException('The provided CsrBackdoorInterface is not '
+          'backdoor writeable.');
     }
     await clk.nextNegedge;
-    intf.en.put(0);
+    intf.wrEn!.put(1);
+    intf.wrData!.put(value.getRegisterVal());
+    await clk.nextNegedge;
+    intf.wrEn!.put(0);
+  }
+
+  // invalid input
+  else {
+    throw CsrValidationException('The provided interface cannot be '
+        'used to access a CSR.');
   }
 }
 
@@ -146,31 +167,49 @@ Future<void> driveCsrValue(
 /// Note that all reads have a latency of 1 cycle.
 Future<void> captureCsrValue(
     {required CsrValue value,
-    required DataPortInterface intf,
+    required Interface<dynamic> intf,
     required Logic clk,
     CsrBlockConfig? block,
     int? logicalRegisterIncrement}) async {
-  final addr = value.config.addr + (block?.baseAddr ?? 0);
-  if (value.width <= intf.dataWidth) {
-    await clk.nextNegedge;
-    intf.en.put(1);
-    intf.addr.put(addr);
-    await clk.nextNegedge;
-    value.setRegisterVal(value: intf.data.value.getRange(0, value.width));
-  } else {
-    final wrCnt = (value.width / intf.dataWidth).ceil();
-    final addrIncr = logicalRegisterIncrement ?? 1;
-    final vals = <LogicValue>[];
-    for (var i = 0; i < wrCnt; i++) {
+  // frontdoor access
+  if (intf is DataPortInterface) {
+    final addr = value.config.addr + (block?.baseAddr ?? 0);
+    if (value.width <= intf.dataWidth) {
       await clk.nextNegedge;
       intf.en.put(1);
-      intf.addr.put(addr + (i * addrIncr));
+      intf.addr.put(addr);
       await clk.nextNegedge;
-      final endIdx = (i + 1) * intf.dataWidth > value.width
-          ? (i + 1) * intf.dataWidth - value.width
-          : intf.dataWidth;
-      vals.add(intf.data.value.getRange(0, endIdx));
+      value.setRegisterVal(value: intf.data.value.getRange(0, value.width));
+    } else {
+      final wrCnt = (value.width / intf.dataWidth).ceil();
+      final addrIncr = logicalRegisterIncrement ?? 1;
+      final vals = <LogicValue>[];
+      for (var i = 0; i < wrCnt; i++) {
+        await clk.nextNegedge;
+        intf.en.put(1);
+        intf.addr.put(addr + (i * addrIncr));
+        await clk.nextNegedge;
+        final endIdx = (i + 1) * intf.dataWidth > value.width
+            ? (i + 1) * intf.dataWidth - value.width
+            : intf.dataWidth;
+        vals.add(intf.data.value.getRange(0, endIdx));
+      }
+      value.setRegisterVal(value: vals.rswizzle());
     }
-    value.setRegisterVal(value: vals.rswizzle());
+  }
+
+  // backdoor access
+  else if (intf is CsrBackdoorInterface) {
+    if (intf.rdData == null) {
+      throw CsrValidationException('The provided CsrBackdoorInterface is not '
+          'backdoor readable.');
+    }
+    value.setRegisterVal(value: intf.rdData!.value);
+  }
+
+  // invalid input
+  else {
+    throw CsrValidationException('The provided interface cannot be '
+        'used to access a CSR.');
   }
 }
