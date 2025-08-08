@@ -95,6 +95,10 @@ class CsrValue {
         vals.add(_fieldMap[field.name]!);
         currIdx = field.start + field.width;
       }
+      if (currIdx < config.width) {
+        vals.add(LogicValue.ofInt(config.resetValue, config.width)
+            .getRange(currIdx));
+      }
       return vals.rswizzle();
     }
   }
