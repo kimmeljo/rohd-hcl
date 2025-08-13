@@ -219,9 +219,9 @@ void main() {
         CsrValue(config: MyFieldCsrInstance(addr: 0x0, width: dataWidth));
 
     // set individual fields
-    final sc1 = LogicValue.ofInt(0x1, 2);
+    const sc1 = 0x1;
     v1.setRegisterFieldVal(fieldName: 'field2', fieldValue: sc1);
-    expect(v1.getRegisterFieldVal(fieldName: 'field2').toInt(), sc1.toInt());
+    expect(v1.getRegisterFieldVal(fieldName: 'field2').toInt(), sc1);
 
     // full register value check
     // field2 starts at bit offset 2, reset value is 0xff
@@ -229,7 +229,7 @@ void main() {
     expect(v1.getRegisterVal().toInt(), 0xf7);
 
     // set full register value
-    final sc2 = LogicValue.ofInt(0xdeadbeef, dataWidth);
+    const sc2 = 0xdeadbeef;
     v1.setRegisterVal(value: sc2);
 
     // note that field rules aren't honored but reserved fields are...
@@ -322,16 +322,15 @@ void main() {
 
     // perform a write of csr2 and then a read
     // ensure that the write takes no effect b/c readonly
-    val2.setRegisterVal(value: LogicValue.ofInt(0xdeadbeef, csrWidth));
+    val2.setRegisterVal(value: 0xdeadbeef);
     await driveCsrValue(value: val2, intf: wIntf, clk: clk);
     await captureCsrValue(value: val2, intf: rIntf, clk: clk);
-    expect(val2.getRegisterVal(),
-        LogicValue.ofInt(csr2.resetValue, rIntf.dataWidth));
+    expect(val2.getRegisterVal().toInt(), csr2.resetValue);
     await clk.waitCycles(10);
 
     // perform a write of csr1
     // ensure that the write data is modified appropriately
-    val1.setRegisterVal(value: LogicValue.ofInt(0xdeadbeef, val1.width));
+    val1.setRegisterVal(value: 0xdeadbeef);
     await driveCsrValue(
         value: val1,
         intf: wIntf,
@@ -342,20 +341,18 @@ void main() {
         intf: rIntf,
         clk: clk,
         logicalRegisterIncrement: csrBlock.logicalRegisterIncrement);
-    expect(val1.getRegisterVal(), LogicValue.ofInt(0xad00f3, rIntf.dataWidth));
+    expect(val1.getRegisterVal().toInt(), 0xad00f3);
     await clk.waitCycles(10);
 
     // perform a write of the top half of csr3
     // then a read of the bottom half
     // ensure that the bottom half is unchanged
-    val3.setRegisterVal(
-        value: LogicValue.ofInt(0xdeadbeef00000000, val3.width));
+    val3.setRegisterVal(value: 0xdeadbeef00000000);
     await driveCsrValue(value: val3, intf: wIntf, clk: clk);
     await captureCsrValue(value: val3, intf: rIntf, clk: clk);
-    expect(val3.getRegisterVal().getRange(0, val3.width ~/ 2),
-        LogicValue.ofInt(0x0, rIntf.dataWidth));
-    expect(val3.getRegisterVal().getRange(val3.width ~/ 2, val3.width),
-        LogicValue.ofInt(0xdeadbeef, rIntf.dataWidth));
+    expect(val3.getRegisterVal().getRange(0, val3.width ~/ 2).toInt(), 0x0);
+    expect(val3.getRegisterVal().getRange(val3.width ~/ 2, val3.width).toInt(),
+        0xdeadbeef);
     await clk.waitCycles(10);
 
     // perform a read of nothing
@@ -377,10 +374,10 @@ void main() {
         LogicValue.ofInt(csr2.resetValue, rIntf.dataWidth));
 
     // perform a backdoor write and then a backdoor read of csr1
-    val1.setRegisterVal(value: LogicValue.ofInt(0xbeefdead, val1.width));
+    val1.setRegisterVal(value: 0xbeefdead);
     await driveCsrValue(value: val1, intf: back1, clk: clk);
     await captureCsrValue(value: val1, intf: back1, clk: clk);
-    expect(val1.getRegisterVal(), LogicValue.ofInt(0xef00f3, rIntf.dataWidth));
+    expect(val1.getRegisterVal().toInt(), 0xef00f3);
 
     await clk.nextNegedge;
     await clk.nextNegedge;
@@ -446,15 +443,14 @@ void main() {
 
     // perform a read to a particular register in a particular block
     await captureCsrValue(value: val2, intf: rIntf, clk: clk, block: block2);
-    expect(val2.getRegisterVal(),
-        LogicValue.ofInt(csr2.resetValue, rIntf.dataWidth));
+    expect(val2.getRegisterVal().toInt(), csr2.resetValue);
     await clk.waitCycles(10);
 
     // perform a write to a particular register in a particular block
-    val1.setRegisterVal(value: LogicValue.ofInt(0xbeefdead, csrWidth));
+    val1.setRegisterVal(value: 0xbeefdead);
     await driveCsrValue(value: val1, intf: wIntf, clk: clk, block: block1);
     await captureCsrValue(value: val1, intf: rIntf, clk: clk, block: block1);
-    expect(val1.getRegisterVal(), LogicValue.ofInt(0xef00f3, rIntf.dataWidth));
+    expect(val1.getRegisterVal().toInt(), 0xef00f3);
     await clk.waitCycles(10);
 
     // perform a read to an invalid block
@@ -476,10 +472,10 @@ void main() {
         LogicValue.ofInt(csr2.resetValue, rIntf.dataWidth));
 
     // perform a backdoor write and then a backdoor read of csr1
-    val1.setRegisterVal(value: LogicValue.ofInt(0xdeadbeef, val1.width));
+    val1.setRegisterVal(value: 0xdeadbeef);
     await driveCsrValue(value: val1, intf: back1, clk: clk);
     await captureCsrValue(value: val1, intf: back1, clk: clk);
-    expect(val1.getRegisterVal(), LogicValue.ofInt(0xad00f3, rIntf.dataWidth));
+    expect(val1.getRegisterVal().toInt(), 0xad00f3);
 
     await clk.nextNegedge;
     await clk.nextNegedge;

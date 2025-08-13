@@ -39,32 +39,23 @@ class CsrValue {
 
   /// Set a given field to a given value.
   void setRegisterFieldVal(
-      {required String fieldName, required LogicValue fieldValue}) {
+      {required String fieldName, required dynamic fieldValue}) {
     if (!_fieldMap.containsKey(fieldName)) {
       throw CsrValidationException('Field $fieldName does not exist '
           'in register ${config.name}');
     }
-    if (_fieldMap[fieldName]!.width != fieldValue.width) {
-      throw CsrValidationException(
-          'The provided field width ${fieldValue.width} '
-          'does not match the given '
-          'fields width ${_fieldMap[fieldName]!.width}.');
-    }
-    _fieldMap[fieldName] = fieldValue;
+    _fieldMap[fieldName] =
+        LogicValue.of(fieldValue, width: _fieldMap[fieldName]!.width);
   }
 
   /// Set the entire register to a given value.
-  void setRegisterVal({required LogicValue value}) {
-    if (config.width != value.width) {
-      throw CsrValidationException('The provided values width ${value.width} '
-          'does not match the given '
-          'registers width ${config.width}.');
-    }
+  void setRegisterVal({required dynamic value}) {
+    final lv = LogicValue.of(value, width: config.width);
     if (config.fields.isEmpty) {
-      _noFieldRegVal = value;
+      _noFieldRegVal = lv;
     } else {
       for (final field in config.fields) {
-        final l = value.getRange(field.start, field.start + field.width);
+        final l = lv.getRange(field.start, field.start + field.width);
         _fieldMap[field.name] = l;
       }
     }
