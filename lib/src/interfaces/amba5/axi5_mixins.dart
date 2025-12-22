@@ -11,7 +11,7 @@ import 'package:meta/meta.dart';
 import 'package:rohd/rohd.dart';
 import 'package:rohd_hcl/rohd_hcl.dart';
 
-// TODO: parity check signals...
+// TODO(kimmeljo): parity check signals...
 
 /// Mixin for request signaling on AXI-5.
 mixin Axi5RequestSignals on Axi5BaseInterface {
@@ -115,8 +115,7 @@ mixin Axi5DataSignals on Axi5BaseInterface {
       if (strbWidth > 0) Logic.port('${prefix}STRB', strbWidth),
       if (usePoison) Logic.port('${prefix}POISON', (dataWidth / 64).ceil())
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }
@@ -215,8 +214,7 @@ mixin Axi5IdSignals on Axi5BaseInterface {
       if (idWidth > 0) Logic.port('${prefix}ID', idWidth),
       if (idWidth > 0 && useIdUnq) Logic.port('${prefix}IDUNQ'),
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }
@@ -270,8 +268,7 @@ mixin Axi5ProtSignals on Axi5BaseInterface {
       if (instPrivPresent) Logic.port('${prefix}INST'),
       if (pasWidth > 0) Logic.port('${prefix}PAS', pasWidth),
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }
@@ -459,8 +456,7 @@ mixin Axi5DebugSignals on Axi5BaseInterface {
       if (tracePresent) Logic.port('${prefix}TRACE'),
       if (loopWidth > 0) Logic.port('${prefix}LOOP', loopWidth),
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }
@@ -726,8 +722,7 @@ mixin Axi5UserSignals on Axi5BaseInterface {
     setPorts([
       if (userWidth > 0) Logic.port('${prefix}USER', userWidth),
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }

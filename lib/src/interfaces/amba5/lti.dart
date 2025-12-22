@@ -34,15 +34,13 @@ abstract class LtiTransportInterface extends Axi5BaseInterface {
     setPorts([
       if (vcCount > 0) Logic.port('${prefix}CREDIT', vcCount),
     ], [
-      if (main) PairDirection.fromConsumer,
-      if (!main) PairDirection.fromProvider,
+      if (main) PairDirection.fromConsumer else PairDirection.fromProvider,
     ]);
 
     setPorts([
       if (vcCount > 1) Logic.port('${prefix}VC', log2Ceil(vcCount)),
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }
@@ -140,7 +138,7 @@ class LtiLaChannelConfig {
 
 /// Basis for all possible LA channels.
 ///
-/// TODO: MMU signals don't have MMU prefix (except for valid...)
+// TODO(kimmeljo): MMU signals don't have MMU prefix (except for valid...)
 class LtiLaChannelInterface extends LtiTransportInterface
     with
         Axi5UserSignals,
@@ -381,7 +379,7 @@ class LtiLrChannelConfig {
 
 /// Basis for all possible LR channels.
 ///
-/// TODO: numRp vs. VC?
+// TODO(kimmeljo): numRp vs. VC?
 class LtiLrChannelInterface extends LtiTransportInterface
     with
         Axi5UserSignals,
@@ -646,7 +644,7 @@ class LtiLtChannelInterface extends LtiTransportInterface with Axi5UserSignals {
 
   /// Constructor.
   LtiLtChannelInterface({
-    required LtiLcChannelConfig config,
+    required LtiLtChannelConfig config,
     this.userMixInEnable = false,
   })  : userWidth = config.userWidth,
         tagWidth = config.tagWidth,
@@ -668,7 +666,7 @@ class LtiLtChannelInterface extends LtiTransportInterface with Axi5UserSignals {
   /// Copy Constructor.
   @override
   LtiLtChannelInterface clone() => LtiLtChannelInterface(
-        config: LtiLcChannelConfig(
+        config: LtiLtChannelConfig(
           userWidth: userWidth,
           tagWidth: tagWidth,
         ),

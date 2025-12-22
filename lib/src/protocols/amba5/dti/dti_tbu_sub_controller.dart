@@ -1,3 +1,12 @@
+// Copyright (C) 2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+//
+// dti_tbu_sub_controller.dart
+// Implementation of DTI Controller for a TBU in the Subordinate direction.
+//
+// 2025 December
+// Author: Josh Kimmel <joshua1.kimmel@intel.com>
+
 import 'package:rohd/rohd.dart';
 import 'package:rohd_hcl/rohd_hcl.dart';
 
@@ -15,13 +24,13 @@ class DtiTbuSubController extends DtiController {
     required super.sys,
     required super.outStream,
     required super.inStream,
-    required super.srcId,
-    required super.destId,
+    super.srcId,
+    super.wakeupTx,
     super.sendMsgs = const [],
     super.rcvMsgs = const [],
     super.sendCfgs = const [],
     super.rcvCfgs = const [],
-    super.outboundArbiter,
+    super.arbiterGen,
     super.name = 'dtiTbuSubController',
   }) {
     _buildSub();
@@ -34,33 +43,43 @@ class DtiTbuSubController extends DtiController {
     required super.sys,
     required super.outStream,
     required super.inStream,
-    required super.srcId,
-    required super.destId,
-    required ReadyAndValidInterface<DtiTbuTransReq> transReq,
+    required ReadyAndValidInterface<DtiMessage> transReq,
     required int transReqFifoDepth,
-    required ReadyAndValidInterface<DtiTbuInvAck> invAck,
+    required ReadyAndValidInterface<DtiMessage> invAck,
     required int invAckFifoDepth,
-    required ReadyAndValidInterface<DtiTbuSyncAck> syncAck,
+    required ReadyAndValidInterface<DtiMessage> syncAck,
     required int syncAckFifoDepth,
-    required ReadyAndValidInterface<DtiTbuCondisReq> condisReq,
+    required ReadyAndValidInterface<DtiMessage> condisReq,
     required int condisReqFifoDepth,
-    required ReadyAndValidInterface<DtiTbuTransRespEx> transResp,
+    required ReadyAndValidInterface<DtiMessage> transResp,
     required int transRespFifoDepth,
-    required ReadyAndValidInterface<DtiTbuTransFault> transFault,
+    required ReadyAndValidInterface<DtiMessage> transFault,
     required int transFaultFifoDepth,
-    required ReadyAndValidInterface<DtiTbuInvReq> invReq,
+    required ReadyAndValidInterface<DtiMessage> invReq,
     required int invReqFifoDepth,
-    required ReadyAndValidInterface<DtiTbuSyncReq> syncReq,
+    required ReadyAndValidInterface<DtiMessage> syncReq,
     required int syncReqFifoDepth,
-    required ReadyAndValidInterface<DtiTbuCondisAck> condisAck,
+    required ReadyAndValidInterface<DtiMessage> condisAck,
     required int condisAckFifoDepth,
-    super.outboundArbiter,
+    ReadyAndValidInterface<DtiMessage>? regWack,
+    int? regWackFifoDepth,
+    ReadyAndValidInterface<DtiMessage>? regRdata,
+    int? regRdataFifoDepth,
+    ReadyAndValidInterface<DtiMessage>? regWr,
+    int? regWrFifoDepth,
+    ReadyAndValidInterface<DtiMessage>? regRd,
+    int? regRdFifoDepth,
+    super.srcId,
+    super.wakeupTx,
+    super.arbiterGen,
     super.name = 'dtiTbuSubController',
   }) : super(rcvMsgs: [
           transReq,
           invAck,
           syncAck,
           condisReq,
+          if (regWack != null) regWack,
+          if (regRdata != null) regRdata,
         ], rcvCfgs: [
           DtiRxMessageInterfaceConfig(
               fifoDepth: transReqFifoDepth,
@@ -82,12 +101,28 @@ class DtiTbuSubController extends DtiController {
               mapToQueue: (msg) => msg
                   .getRange(0, DtiTbuCondisReq.msgTypeWidth)
                   .eq(DtiDownstreamMsgType.condisReq.value)),
+          if (regWack != null)
+            DtiRxMessageInterfaceConfig(
+              fifoDepth: regWackFifoDepth!,
+              mapToQueue: (msg) => msg
+                  .getRange(0, DtiTbuRegWack.msgTypeWidth)
+                  .eq(DtiDownstreamMsgType.regWAck.value),
+            ),
+          if (regRdata != null)
+            DtiRxMessageInterfaceConfig(
+              fifoDepth: regRdataFifoDepth!,
+              mapToQueue: (msg) => msg
+                  .getRange(0, DtiTbuRegRdata.msgTypeWidth)
+                  .eq(DtiDownstreamMsgType.regRData.value),
+            ),
         ], sendMsgs: [
           transResp,
           transFault,
           invReq,
           syncReq,
           condisAck,
+          if (regWr != null) regWr,
+          if (regRd != null) regRd,
         ], sendCfgs: [
           DtiTxMessageInterfaceConfig(fifoDepth: transRespFifoDepth),
           DtiTxMessageInterfaceConfig(fifoDepth: transFaultFifoDepth),
@@ -98,6 +133,10 @@ class DtiTbuSubController extends DtiController {
           DtiTxMessageInterfaceConfig(fifoDepth: syncReqFifoDepth),
           DtiTxMessageInterfaceConfig(
               fifoDepth: condisAckFifoDepth, connectedExempt: true),
+          if (regWr != null)
+            DtiTxMessageInterfaceConfig(fifoDepth: regWrFifoDepth!),
+          if (regRd != null)
+            DtiTxMessageInterfaceConfig(fifoDepth: regRdFifoDepth!),
         ]) {
     _buildSub();
   }
@@ -108,9 +147,9 @@ class DtiTbuSubController extends DtiController {
     var conAckIdx = -1;
     var invReqIdx = -1;
     for (var i = 0; i < sendMsgs.length; i++) {
-      if (sendMsgs[i].data is DtiTbuCondisAck) {
+      if (sendMsgs[i].data.msg is DtiTbuCondisAck) {
         conAckIdx = i;
-      } else if (sendMsgs[i].data is DtiTbuInvReq) {
+      } else if (sendMsgs[i].data.msg is DtiTbuInvReq) {
         invReqIdx = i;
       }
     }
@@ -120,14 +159,14 @@ class DtiTbuSubController extends DtiController {
     }
     final condisAckSend = sendMsgs[conAckIdx];
     final condisAckData = DtiTbuCondisAck(name: 'condisAckData')
-      ..gets(condisAckSend.data);
+      ..gets(condisAckSend.data.msg);
 
     var conReqIdx = -1;
     var invAckIdx = -1;
     for (var i = 0; i < rcvMsgs.length; i++) {
-      if (rcvMsgs[i].data is DtiTbuCondisReq) {
+      if (rcvMsgs[i].data.msg is DtiTbuCondisReq) {
         conReqIdx = i;
-      } else if (rcvMsgs[i].data is DtiTbuInvAck) {
+      } else if (rcvMsgs[i].data.msg is DtiTbuInvAck) {
         invAckIdx = i;
       }
     }
@@ -137,7 +176,7 @@ class DtiTbuSubController extends DtiController {
     }
     final condisReqOut = rcvMsgs[conReqIdx];
     final condisReqData = DtiTbuCondisReq(name: 'condisReqData')
-      ..gets(condisReqOut.data);
+      ..gets(condisReqOut.data.msg);
 
     // on CondisReq, make sure to grab the granted # of tokens
     _invTokensGranted =
@@ -199,8 +238,8 @@ class DtiTbuSubController extends DtiController {
             events: {disconnIn: DtiConnectionState.pendingDisconn},
             actions: []),
         // PENDINGIDSCONN:
-        //  move to UNCONNECTED when an ACK comes in that confirms disconnenction
-        //  move back CONNECTED when an ACK comes in that rejects disconnection
+        //  move to UNCONNECTED when ACK comes in that confirms disconnenction
+        //  move back CONNECTED when ACK comes in that rejects disconnection
         State(
           DtiConnectionState.pendingDisconn,
           events: {
