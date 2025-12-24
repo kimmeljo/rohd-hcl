@@ -364,7 +364,7 @@ abstract class DtiController extends Module {
     final nextMsgInValid = Logic(name: 'nextMsgInValid');
     final nextMsgIn = Logic(name: 'nextMsgIn', width: _receiver.msg.width);
 
-    final nextGate = _receiver.msgValid & _receiverCanAccept;
+    final nextGate = _receiverCanAccept;
 
     // flop the next message received from the stream interface
     Sequential(sys.clk, reset: ~sys.resetN, [
