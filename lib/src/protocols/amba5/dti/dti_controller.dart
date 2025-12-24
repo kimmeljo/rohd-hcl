@@ -419,6 +419,6 @@ abstract class DtiController extends Module {
             (i) => _inMsgs[i].full & rcvCfgs[i].mapToQueue!(nextMsgIn))
         .swizzle()
         .or();
-    _receiverCanAccept <= ~queueFull;
+    _receiverCanAccept <= ~queueFull | ~nextMsgInValid;
   }
 }
