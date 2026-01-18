@@ -8,7 +8,6 @@
 // Author: Josh Kimmel <joshua1.kimmel@intel.com>
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:logging/logging.dart';
@@ -253,9 +252,9 @@ class Axi4BfmTest extends Test {
       await dataTracker.terminate();
       await respTracker.terminate();
 
-      final jsonStr =
-          File('$outFolder/Axi4Tracker.tracker.json').readAsStringSync();
-      json.decode(jsonStr);
+      // final jsonStr =
+      //     File('$outFolder/Axi4Tracker.tracker.json').readAsStringSync();
+      // json.decode(jsonStr);
 
       // Here can do any checking against the tracker contents...
 
@@ -789,7 +788,7 @@ class Axi4BfmReadModifyWriteAbortTest extends Axi4BfmTest {
     final transSize = size ?? Test.random!.nextInt(maxSize + 1);
     final pBurst = burst ?? Axi4BurstField.incr;
 
-    // send the read
+    // first send the locked read
     final rdPkt = genRdPacket(
       laneId1,
       addr: pAddr,
@@ -798,11 +797,7 @@ class Axi4BfmReadModifyWriteAbortTest extends Axi4BfmTest {
       burst: pBurst,
       lock: true,
     );
-    mainAgents[laneId1].readAgent.reqAgent.sequencer.add(rdPkt);
-
-    await rdPkt.completed;
-
-    // now send a read on another channel
+    // then send an unlocked read on another channel
     final rdPktBad = genRdPacket(
       laneId2,
       addr: pAddr,
@@ -811,12 +806,12 @@ class Axi4BfmReadModifyWriteAbortTest extends Axi4BfmTest {
       burst: pBurst,
       lock: false,
     );
+    mainAgents[laneId1].readAgent.reqAgent.sequencer.add(rdPkt);
+    await rdPkt.completed;
     mainAgents[laneId2].readAgent.reqAgent.sequencer.add(rdPktBad);
 
-    await rdPktBad.completed;
-
-    // must wait for the read data to come back
-    final obj = phase.raiseObjection('${name}DataReturnObj');
+    // wait for the first read response to come back
+    final obj = phase.raiseObjection('${name}DataReturnObj$laneId1$laneId2');
     mainAgents[laneId1].readAgent.dataAgent.monitor!.stream.listen((d) async {
       final pData = List.generate(
           d.data.width ~/ wIntf1.dataWidth,
@@ -845,8 +840,11 @@ class Axi4BfmReadModifyWriteAbortTest extends Axi4BfmTest {
 
       await wrPkts.$1.completed;
       await wrPkts.$2.completed;
-      obj.drop();
+      if (obj.isRaised) {
+        obj.drop();
+      }
     });
+    await obj.dropped;
   }
 
   Axi4BfmReadModifyWriteAbortTest(
@@ -1253,7 +1251,7 @@ void main() {
 
   setUp(() async {
     // Set the logger level
-    Logger.root.level = Level.OFF;
+    Logger.root.level = Level.WARNING;
   });
 
   Future<void> runTest(Axi4BfmTest axi4BfmTest,
@@ -1298,7 +1296,6 @@ void main() {
           start: LogicValue.ofInt(0x0, 32), end: LogicValue.ofInt(0x1000, 32))
     ]));
   });
-
   test('protection writes and read', () async {
     await runTest(Axi4BfmProtWriteReadTest('prot', ranges: [
       AxiAddressRange(
@@ -1321,6 +1318,7 @@ void main() {
       'rmwAbort',
       numLanes: 2,
       supportLocking: true,
+      withRandomRspDelays: true,
     ));
   });
 
@@ -1338,6 +1336,7 @@ void main() {
 
   test('evil write compliance', () async {
     Simulator.setMaxSimTime(10000);
+    Logger.root.level = Level.OFF;
     try {
       await Axi4WriteComplianceEvilTest('evilWriteCompliance').start();
     } on Exception catch (e) {
@@ -1347,6 +1346,7 @@ void main() {
 
   test('evil read compliance', () async {
     Simulator.setMaxSimTime(30000);
+    Logger.root.level = Level.OFF;
     try {
       await Axi4ReadComplianceEvilTest('evilReadCompliance').start();
     } on Exception catch (e) {

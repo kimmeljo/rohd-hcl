@@ -11,7 +11,7 @@ import 'dart:async';
 
 import 'package:rohd/rohd.dart';
 import 'package:rohd_hcl/src/interfaces/interfaces.dart';
-import 'package:rohd_hcl/src/models/amba4_bfm/axi4_bfm.dart';
+import 'package:rohd_hcl/src/models/amba/amba4_bfm/axi4_bfm.dart';
 import 'package:rohd_vf/rohd_vf.dart';
 
 /// A driver for the [Axi4RequestChannelInterface] interface.
@@ -103,8 +103,8 @@ class Axi4RequestChannelDriver extends PendingClockedDriver<Axi4RequestPacket> {
 
     // need to hold the request until receiver is ready
     await sIntf.clk.nextPosedge;
-    if (!rIntf.ready.previousValue!.toBool()) {
-      await rIntf.ready.nextPosedge;
+    while (!rIntf.ready.previousValue!.toBool()) {
+      await sIntf.clk.nextPosedge;
     }
 
     // now we can release the request
@@ -119,19 +119,22 @@ class Axi4RequestChannelDriver extends PendingClockedDriver<Axi4RequestPacket> {
 /// A driver for the ready signal on any [Axi4ChannelInterface] interface.
 class Axi4ReadyDriver extends Component {
   /// AXI4 System Interface.
-  final Axi4SystemInterface sIntf;
+  final Axi4SystemInterface sys;
 
   /// AXI4 Interface.
-  final Axi4ChannelInterface rIntf;
+  final Axi4ChannelInterface chan;
 
   /// the frequency with which the ready signal should be driven.
   final num readyFrequency;
 
-  /// Creates a new [Axi4RequestChannelDriver].
+  /// ready disabled
+  bool _disabled = false;
+
+  /// Creates a new [Axi4ReadyDriver].
   Axi4ReadyDriver({
     required Component parent,
-    required this.sIntf,
-    required this.rIntf,
+    required this.sys,
+    required this.chan,
     this.readyFrequency = 1.0,
     String name = 'axi4ReadyDriver',
   }) : super(
@@ -139,21 +142,32 @@ class Axi4ReadyDriver extends Component {
           parent,
         );
 
+  /// mechanism to turn off the ready.
+  void disable() => _disabled = true;
+
+  /// mechanism to turn on the ready.
+  void enable() => _disabled = false;
+
   @override
   Future<void> run(Phase phase) async {
     unawaited(super.run(phase));
 
     Simulator.injectAction(() {
-      rIntf.ready.put(0);
+      chan.ready.put(0);
     });
 
     // wait for reset to complete before driving anything
-    await sIntf.resetN.nextPosedge;
+    await sys.resetN.nextPosedge;
 
     while (!Simulator.simulationHasEnded) {
-      final next = Test.random!.nextDouble() < readyFrequency;
-      rIntf.ready.put(next);
-      await sIntf.clk.nextPosedge;
+      if (_disabled) {
+        chan.ready.put(0);
+      } else {
+        final next = Test.random!.nextDouble() < readyFrequency;
+        chan.ready.put(next);
+      }
+
+      await sys.clk.nextPosedge;
     }
   }
 }

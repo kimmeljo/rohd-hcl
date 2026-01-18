@@ -55,7 +55,7 @@ class Axi4RequestPacket extends SequenceItem implements Trackable {
   final LogicValue? bar;
 
   /// Creates a new packet.
-  // TODO: how to capture the type (AR vs. AW)??
+  // TODO(kimmeljo): how to capture the type (AR vs. AW)??
   Axi4RequestPacket(
       {required this.addr,
       required this.prot,

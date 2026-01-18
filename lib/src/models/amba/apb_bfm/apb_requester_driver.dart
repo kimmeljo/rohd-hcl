@@ -11,7 +11,7 @@ import 'dart:async';
 
 import 'package:rohd/rohd.dart';
 import 'package:rohd_hcl/src/interfaces/interfaces.dart';
-import 'package:rohd_hcl/src/models/apb_bfm/apb_packet.dart';
+import 'package:rohd_hcl/src/models/amba/apb_bfm/apb_packet.dart';
 import 'package:rohd_vf/rohd_vf.dart';
 
 /// A driver for the [ApbInterface] from the requester side.

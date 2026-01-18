@@ -11,7 +11,7 @@ import 'dart:async';
 
 import 'package:rohd/rohd.dart';
 import 'package:rohd_hcl/src/interfaces/interfaces.dart';
-import 'package:rohd_hcl/src/models/amba4_bfm/axi4_bfm.dart';
+import 'package:rohd_hcl/src/models/amba/amba4_bfm/axi4_bfm.dart';
 import 'package:rohd_vf/rohd_vf.dart';
 
 /// A driver for the [Axi4BaseBChannelInterface] interface.
@@ -80,8 +80,8 @@ class Axi4ResponseChannelDriver
 
     // need to hold the request until receiver is ready
     await sIntf.clk.nextPosedge;
-    if (!rIntf.ready.previousValue!.toBool()) {
-      await rIntf.ready.nextPosedge;
+    while (!rIntf.ready.previousValue!.toBool()) {
+      await sIntf.clk.nextPosedge;
     }
 
     // now we can release the request

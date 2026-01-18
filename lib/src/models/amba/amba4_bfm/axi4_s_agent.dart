@@ -78,10 +78,7 @@ class Axi4StreamSubordinateAgent extends Agent {
     this.readyFrequency = 1.0,
   }) : super(name, parent) {
     readyDriver = Axi4ReadyDriver(
-        parent: this,
-        sIntf: sIntf,
-        rIntf: rIntf,
-        readyFrequency: readyFrequency);
+        parent: this, sys: sIntf, chan: rIntf, readyFrequency: readyFrequency);
 
     monitor = Axi4StreamMonitor(sIntf: sIntf, rIntf: rIntf, parent: parent);
   }

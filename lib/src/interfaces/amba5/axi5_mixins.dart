@@ -11,7 +11,7 @@ import 'package:meta/meta.dart';
 import 'package:rohd/rohd.dart';
 import 'package:rohd_hcl/rohd_hcl.dart';
 
-// TODO: parity check signals...
+// TODO(kimmeljo): parity check signals...
 
 /// Mixin for request signaling on AXI-5.
 mixin Axi5RequestSignals on Axi5BaseInterface {
@@ -115,8 +115,7 @@ mixin Axi5DataSignals on Axi5BaseInterface {
       if (strbWidth > 0) Logic.port('${prefix}STRB', strbWidth),
       if (usePoison) Logic.port('${prefix}POISON', (dataWidth / 64).ceil())
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }
@@ -215,8 +214,7 @@ mixin Axi5IdSignals on Axi5BaseInterface {
       if (idWidth > 0) Logic.port('${prefix}ID', idWidth),
       if (idWidth > 0 && useIdUnq) Logic.port('${prefix}IDUNQ'),
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }
@@ -270,8 +268,7 @@ mixin Axi5ProtSignals on Axi5BaseInterface {
       if (instPrivPresent) Logic.port('${prefix}INST'),
       if (pasWidth > 0) Logic.port('${prefix}PAS', pasWidth),
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }
@@ -408,11 +405,6 @@ mixin Axi5MemRespDataTagSignals on Axi5BaseInterface {
   /// Helper to instantiate ACE specific request ports.
   @protected
   void makeRespDataTagPorts() {
-    setPorts([
-      Logic.port('${prefix}TAG', (tagDataWidth / 128).ceil() * 4),
-    ], [
-      PairDirection.fromConsumer,
-    ]);
     if (main) {
       setPorts([
         if (useTag) Logic.port('${prefix}TAG', (tagDataWidth / 128).ceil() * 4),
@@ -459,8 +451,7 @@ mixin Axi5DebugSignals on Axi5BaseInterface {
       if (tracePresent) Logic.port('${prefix}TRACE'),
       if (loopWidth > 0) Logic.port('${prefix}LOOP', loopWidth),
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }
@@ -539,9 +530,9 @@ mixin Axi5MmuSignals on Axi5BaseInterface {
     setPorts([
       if (untranslatedTransVersion >= 3) Logic.port('${prefix}MMUVALID'),
       if (secSidWidth > 0) Logic.port('${prefix}MMUSECSID', secSidWidth),
-      if (sidWidth > 0) Logic.port('${prefix}MMUSID'),
+      if (sidWidth > 0) Logic.port('${prefix}MMUSID', sidWidth),
       if (ssidWidth > 0) Logic.port('${prefix}MMUSSIDV'),
-      if (ssidWidth > 0) Logic.port('${prefix}MMUSSID'),
+      if (ssidWidth > 0) Logic.port('${prefix}MMUSSID', ssidWidth),
       if (untranslatedTransVersion == 1 && useFlow)
         Logic.port('${prefix}MMUATST'),
       if (untranslatedTransVersion > 1 && useFlow)
@@ -601,7 +592,7 @@ mixin Axi5QualifierSignals on Axi5BaseInterface {
     setPorts([
       if (useNsaId) Logic.port('${prefix}NSAID', 4),
       if (usePbha) Logic.port('${prefix}PBHA', 4),
-      if (subSysIdWidth > 0) Logic.port('${prefix}SUBSYSID'),
+      if (subSysIdWidth > 0) Logic.port('${prefix}SUBSYSID', subSysIdWidth),
       if (actWidth > 0) Logic.port('${prefix}ACTV'),
       if (actWidth > 0) Logic.port('${prefix}ACT', actWidth),
     ], [
@@ -726,8 +717,7 @@ mixin Axi5UserSignals on Axi5BaseInterface {
     setPorts([
       if (userWidth > 0) Logic.port('${prefix}USER', userWidth),
     ], [
-      if (main) PairDirection.fromProvider,
-      if (!main) PairDirection.fromConsumer,
+      if (main) PairDirection.fromProvider else PairDirection.fromConsumer,
     ]);
   }
 }

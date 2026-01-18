@@ -47,7 +47,7 @@ class Axi4SubordinateMemoryAgent extends Agent {
 
   /// Channels that the subordinate manages.
   ///
-  /// TODO: this requires every lane to be read/write...
+  // TODO(kimmeljo): this requires every lane to be read/write...
   final List<Axi4SubordinateClusterAgent> lanes;
 
   /// A place where the subordinate should save and retrieve data.
@@ -170,9 +170,6 @@ class Axi4SubordinateMemoryAgent extends Agent {
       }
     });
 
-    // wait for reset to complete
-    await sIntf.resetN.nextPosedge;
-
     // register listeners on requests
     //  AR (read request)
     //  AW (write request)
@@ -197,6 +194,9 @@ class Axi4SubordinateMemoryAgent extends Agent {
           .stream
           .listen((d) => _receiveRead(packet: d, index: i));
     }
+
+    // wait for reset to complete
+    await sIntf.resetN.nextPosedge;
 
     // handle responding to requests
     while (!Simulator.simulationHasEnded) {
@@ -354,7 +354,10 @@ class Axi4SubordinateMemoryAgent extends Agent {
         ) {
       final packet = _dataReadResponseMetadataQueue[mapIdx][0];
       // final reqSideError = _dataReadResponseErrorQueue[mapIdx][0];
-      final currData = _dataReadResponseDataQueue[mapIdx][0].rswizzle();
+      final currData = _dataReadResponseDataQueue[mapIdx][0]
+          .map((d) => d.zeroExtend(rIntf.dataWidth))
+          .toList()
+          .rswizzle();
       final error = respondWithError != null && respondWithError!(packet);
 
       // check the request's region for legality
@@ -453,7 +456,7 @@ class Axi4SubordinateMemoryAgent extends Agent {
     final wIntf = lanes[index].wIntf;
     final mapIdx = _writeAddrToChannel[index]!;
 
-    // TODO: what about interleaving data on the same lane but w/ different IDs...
+    // TODO(kimmeljo): what about interleaving data on the same lane but w/ different IDs...
 
     // NOTE: we are dropping wUser on the floor for now...
     final dataPacket =
